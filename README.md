@@ -2,6 +2,10 @@
 
 A twenty-sided die you tap to roll. It's a single web page that installs to a phone's home screen and works offline.
 
+**Play it:** https://digitalduquette.github.io/d20/
+
+On iPhone, open that link in Safari, tap Share, then Add to Home Screen.
+
 ## Run it locally
 
 ```
