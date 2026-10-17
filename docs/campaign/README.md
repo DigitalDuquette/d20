@@ -2,7 +2,7 @@
 
 Campaign Mode adds an AI dungeon master to Tap d20 for solo role-playing. You play one character, say what you do in plain words, and roll the app's own dice when the game asks. The AI describes the world and its people. The app's code owns the rules, the dice, the turn order and the saved state.
 
-Status: plan, not built. Work is tracked in GitHub issues labeled `campaign`, under the tracking issue "Campaign Mode: AI dungeon master".
+Status: plan, not built. Work is tracked in GitHub issues labeled `campaign`, as sub-issues of tracking issue #32, grouped by the `Campaign 0` to `Campaign 5` milestones. Plan sign-off is #33.
 
 ## What it must feel like
 

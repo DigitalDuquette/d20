@@ -1,6 +1,8 @@
 # Tap d20 for iPhone
 
-Plan for a native SwiftUI version of the web app. The work is tracked as issues labeled `ios`. These wireframes show what each screen should look like.
+Plan for a native SwiftUI version of the web app. The work is tracked as issues labeled `ios` (#1 to #31), grouped by the `iOS 1` to `iOS 8` milestones. These wireframes show what each screen should look like.
+
+Open decision before #5 starts: Campaign Mode's Apple Intelligence provider (#57) needs the iPhone app to host the web app in a web view. That means choosing between this full SwiftUI rewrite, a web-view shell for everything, or SwiftUI dice with a web-view campaign screen. Most of #6 to #28 change if the answer is a web-view shell.
 
 | Roll | Advantage | Dice picker | Damage roll |
 | --- | --- | --- | --- |
