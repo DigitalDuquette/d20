@@ -1,0 +1,402 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Tap d20</title>
+<meta name="description" content="Tap the die to roll a d20.">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="theme-color" content="#e4e8e2" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#121714" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="d20">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="preload" href="fonts/cinzel-latin-800-normal.woff2" as="font" type="font/woff2" crossorigin>
+<style>
+@font-face { font-family: "Cinzel"; font-weight: 800; font-display: swap; src: url("fonts/cinzel-latin-800-normal.woff2") format("woff2"); }
+@font-face { font-family: "Figtree"; font-weight: 400; font-display: swap; src: url("fonts/figtree-latin-400-normal.woff2") format("woff2"); }
+@font-face { font-family: "Figtree"; font-weight: 600; font-display: swap; src: url("fonts/figtree-latin-600-normal.woff2") format("woff2"); }
+
+/* One-screen table: the die sits centered on a felt ground, result below, roll history as a quiet strip. */
+:root {
+  --bg: #e4e8e2;
+  --felt: #d3dbd2;
+  --fg: #1e2622;
+  --muted: #5f6b64;
+  --accent: #3a2f6b;
+  --crit: #a0761a;
+  --fumble: #a33a2e;
+  --chip: #c7d0c6;
+  --display: "Cinzel", "Trajan Pro", Georgia, serif;
+  --body: "Figtree", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #121714; --felt: #1a221d; --fg: #e9ede7; --muted: #94a199;
+    --accent: #b9adf2; --crit: #e2b44f; --fumble: #ef7a6b; --chip: #26302a;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #121714; --felt: #1a221d; --fg: #e9ede7; --muted: #94a199;
+  --accent: #b9adf2; --crit: #e2b44f; --fumble: #ef7a6b; --chip: #26302a;
+  color-scheme: dark;
+}
+html, body { height: 100%; margin: 0; }
+html { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); box-sizing: border-box; }
+body { font-size: 14px; }
+body {
+  background: radial-gradient(ellipse at 50% 40%, var(--felt), var(--bg) 70%);
+  background-color: var(--bg);
+  color: var(--fg);
+  font-family: var(--body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 16px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+#stage {
+  width: min(380px, 100%);
+  aspect-ratio: 1;
+  max-width: 100%;
+  cursor: pointer;
+  border: 0;
+  padding: 0;
+  background: none;
+  border-radius: 50%;
+  position: relative;
+  touch-action: manipulation;
+}
+#stage:focus-visible { outline: 3px solid var(--accent); outline-offset: 4px; }
+#stage canvas { width: 100% !important; height: 100% !important; display: block; }
+#result {
+  font-family: var(--display);
+  font-weight: 800;
+  font-size: clamp(64px, 18vw, 104px);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  min-height: 1em;
+  transition: color .2s, transform .25s;
+}
+#result.pop { animation: pop .35s ease-out; }
+@keyframes pop { 0% { transform: scale(.7); opacity: .2 } 70% { transform: scale(1.08) } 100% { transform: scale(1); opacity: 1 } }
+#result.crit { color: var(--crit); }
+#result.fumble { color: var(--fumble); }
+#label {
+  font-size: 13px;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--muted);
+  min-height: 1.4em;
+  font-weight: 600;
+}
+#label.crit { color: var(--crit); }
+#label.fumble { color: var(--fumble); }
+#history {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  min-height: 28px;
+  max-width: 380px;
+  margin-top: 8px;
+}
+#history span {
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+  font-weight: 600;
+  min-width: 2.2em;
+  text-align: center;
+  padding: 4px 6px;
+  border-radius: 6px;
+  background: var(--chip);
+  color: var(--muted);
+}
+#history span.crit { color: var(--crit); }
+#history span.fumble { color: var(--fumble); }
+#history .hint { background: none; color: var(--muted); font-weight: 400; }
+@media (prefers-reduced-motion: reduce) { #result.pop { animation: none; } }
+</style>
+</head>
+<body>
+
+<button id="stage" type="button" aria-label="Roll the d20"></button>
+<div id="result" aria-live="polite">20</div>
+<div id="label">Tap the die to roll</div>
+<div id="history"><span class="hint">Last rolls show here</span></div>
+
+<script src="vendor/three.min.js"></script>
+<script>
+(async function () {
+  const stage = document.getElementById('stage');
+  const resultEl = document.getElementById('result');
+  const labelEl = document.getElementById('label');
+  const historyEl = document.getElementById('history');
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  try { await document.fonts.load('800 100px Cinzel'); } catch (e) {}
+
+  // Renderer
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.outputEncoding = THREE.sRGBEncoding;
+  stage.appendChild(renderer.domElement);
+
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(32, 1, 0.1, 50);
+  camera.position.set(0, 0, 6.2);
+
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x404050, 0.55));
+  const key = new THREE.DirectionalLight(0xffffff, 0.95);
+  key.position.set(-2.5, 3.5, 5);
+  scene.add(key);
+  const rim = new THREE.DirectionalLight(0xc9c0ff, 0.35);
+  rim.position.set(3, -2, 2);
+  scene.add(rim);
+
+  // Shadow under the die
+  const shadowCanvas = document.createElement('canvas');
+  shadowCanvas.width = shadowCanvas.height = 128;
+  const sctx = shadowCanvas.getContext('2d');
+  const grad = sctx.createRadialGradient(64, 64, 0, 64, 64, 64);
+  grad.addColorStop(0, 'rgba(0,0,0,0.38)');
+  grad.addColorStop(1, 'rgba(0,0,0,0)');
+  sctx.fillStyle = grad;
+  sctx.fillRect(0, 0, 128, 128);
+  const shadow = new THREE.Mesh(
+    new THREE.PlaneGeometry(2.4, 0.7),
+    new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(shadowCanvas), transparent: true, depthWrite: false })
+  );
+  shadow.position.set(0, -1.45, -0.5);
+  scene.add(shadow);
+
+  // Build the icosahedron with one material per face
+  const base = new THREE.IcosahedronGeometry(1.15, 0);
+  const pos = base.getAttribute('position');
+  const faceCount = pos.count / 3;
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', pos.clone());
+  const H = Math.sqrt(3) / 2;
+  const vTop = 1, vBot = 1 - H;
+  const uvs = [];
+  for (let i = 0; i < faceCount; i++) {
+    uvs.push(0.5, vTop, 0, vBot, 1, vBot);
+    geo.addGroup(i * 3, 3, i);
+  }
+  geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+  geo.computeVertexNormals();
+
+  // Face frames: normal and "up" (centroid toward first vertex, which is the top of the numeral)
+  const faces = [];
+  const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
+  for (let i = 0; i < faceCount; i++) {
+    a.fromBufferAttribute(pos, i * 3);
+    b.fromBufferAttribute(pos, i * 3 + 1);
+    c.fromBufferAttribute(pos, i * 3 + 2);
+    const centroid = new THREE.Vector3().add(a).add(b).add(c).divideScalar(3);
+    const normal = new THREE.Vector3().subVectors(b, a).cross(new THREE.Vector3().subVectors(c, a)).normalize();
+    if (normal.dot(centroid) < 0) normal.negate();
+    const up = new THREE.Vector3().subVectors(a, centroid).normalize();
+    faces.push({ normal, up, value: 0 });
+  }
+
+  // Number faces so opposite sides add up to 21, like a real d20
+  let next = 1;
+  for (let i = 0; i < faceCount; i++) {
+    if (faces[i].value) continue;
+    let opp = -1, best = 1;
+    for (let j = 0; j < faceCount; j++) {
+      const d = faces[i].normal.dot(faces[j].normal);
+      if (j !== i && !faces[j].value && d < best) { best = d; opp = j; }
+    }
+    faces[i].value = next;
+    faces[opp].value = 21 - next;
+    next++;
+  }
+
+  function faceTexture(n) {
+    const S = 256;
+    const cv = document.createElement('canvas');
+    cv.width = cv.height = S;
+    const ctx = cv.getContext('2d');
+    const g = ctx.createLinearGradient(0, 0, 0, S * H);
+    g.addColorStop(0, '#4b3e8c');
+    g.addColorStop(1, '#2c2458');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, S, S);
+    // inner triangle line for a cut-edge look
+    const cy = (1 - (vTop + vBot * 2) / 3) * S;
+    ctx.save();
+    ctx.translate(S / 2, cy);
+    ctx.scale(0.86, 0.86);
+    ctx.translate(-S / 2, -cy);
+    ctx.beginPath();
+    ctx.moveTo(S / 2, 0);
+    ctx.lineTo(0, S * H);
+    ctx.lineTo(S, S * H);
+    ctx.closePath();
+    ctx.strokeStyle = 'rgba(255,255,255,0.10)';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    ctx.restore();
+
+    const isMax = n === 20, isOne = n === 1;
+    ctx.fillStyle = isMax ? '#f2cf74' : '#f3eee0';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = `800 ${n >= 10 ? 76 : 86}px Cinzel, Georgia, serif`;
+    ctx.shadowColor = 'rgba(0,0,0,0.45)';
+    ctx.shadowBlur = 4;
+    ctx.shadowOffsetY = 2;
+    ctx.fillText(String(n), S / 2, cy + 6);
+    if (n === 6 || n === 9) {
+      ctx.fillRect(S / 2 - 18, cy + 44, 36, 6);
+    }
+    const tex = new THREE.CanvasTexture(cv);
+    tex.encoding = THREE.sRGBEncoding;
+    tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+    return tex;
+  }
+
+  const materials = faces.map(f => new THREE.MeshStandardMaterial({
+    map: faceTexture(f.value), roughness: 0.32, metalness: 0.08, flatShading: true
+  }));
+  const die = new THREE.Mesh(geo, materials);
+  scene.add(die);
+
+  // Orientation that shows a given face to the camera, numeral upright, with a slight tilt
+  const tilt = new THREE.Quaternion().setFromEuler(new THREE.Euler(-0.2, 0.16, 0));
+  function showFace(i) {
+    const f = faces[i];
+    const right = new THREE.Vector3().crossVectors(f.up, f.normal).normalize();
+    const m = new THREE.Matrix4().makeBasis(right, f.up, f.normal);
+    const q = new THREE.Quaternion().setFromRotationMatrix(m).invert();
+    return tilt.clone().multiply(q);
+  }
+
+  function randInt(n) {
+    const buf = new Uint32Array(1);
+    const limit = Math.floor(0x100000000 / n) * n;
+    do { crypto.getRandomValues(buf); } while (buf[0] >= limit);
+    return buf[0] % n;
+  }
+
+  function resize() {
+    const w = stage.clientWidth;
+    renderer.setSize(w, w, false);
+    camera.aspect = 1;
+    camera.updateProjectionMatrix();
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  // Start showing 20
+  const startFace = faces.findIndex(f => f.value === 20);
+  die.quaternion.copy(showFace(startFace));
+
+  let anim = null;
+  const history = [];
+
+  function roll() {
+    if (anim) return;
+    const value = randInt(20) + 1;
+    const idx = faces.findIndex(f => f.value === value);
+    const axis = new THREE.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).normalize();
+    anim = {
+      t0: performance.now(),
+      dur: reduceMotion ? 250 : 1500,
+      from: die.quaternion.clone(),
+      to: showFace(idx),
+      axis,
+      turns: reduceMotion ? 0 : 3 + randInt(2),
+      value
+    };
+    resultEl.textContent = '';
+    resultEl.className = '';
+    labelEl.textContent = 'Rolling…';
+    labelEl.className = '';
+  }
+
+  function finish(value) {
+    resultEl.textContent = value;
+    const cls = value === 20 ? 'crit' : value === 1 ? 'fumble' : '';
+    resultEl.className = cls;
+    void resultEl.offsetWidth;
+    resultEl.classList.add('pop');
+    labelEl.className = cls;
+    labelEl.textContent = value === 20 ? 'Natural 20' : value === 1 ? 'Natural 1' : 'Tap to roll again';
+
+    history.unshift(value);
+    if (history.length > 12) history.pop();
+    historyEl.innerHTML = '';
+    history.forEach(v => {
+      const s = document.createElement('span');
+      s.textContent = v;
+      if (v === 20) s.className = 'crit';
+      if (v === 1) s.className = 'fumble';
+      historyEl.appendChild(s);
+    });
+    try { navigator.vibrate && navigator.vibrate(value === 20 ? [30, 40, 30] : 20); } catch (e) {}
+  }
+
+  const easeOut = t => 1 - Math.pow(1 - t, 3);
+  const spin = new THREE.Quaternion();
+  const tmp = new THREE.Quaternion();
+  let idleT = 0;
+
+  function frame(now) {
+    if (anim) {
+      const t = Math.min(1, (now - anim.t0) / anim.dur);
+      const e = easeOut(t);
+      tmp.copy(anim.from).slerp(anim.to, e);
+      spin.setFromAxisAngle(anim.axis, anim.turns * Math.PI * 2 * (1 - e));
+      die.quaternion.copy(spin).multiply(tmp);
+
+      // bounces: decaying hops
+      const hop = reduceMotion ? 0 : Math.abs(Math.sin(t * Math.PI * 3)) * Math.pow(1 - t, 1.6) * 0.9;
+      die.position.y = hop;
+      const s = 1 - hop * 0.35;
+      shadow.scale.set(s, s, 1);
+      shadow.material.opacity = 1 - hop * 0.6;
+
+      if (t >= 1) {
+        die.position.y = 0;
+        const v = anim.value;
+        anim = null;
+        finish(v);
+      }
+    } else if (!reduceMotion) {
+      idleT += 0.016;
+      die.position.y = Math.sin(idleT * 1.6) * 0.03;
+    }
+    renderer.render(scene, camera);
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+
+  stage.addEventListener('click', roll);
+  document.addEventListener('keydown', e => {
+    if ((e.code === 'Space' || e.code === 'Enter') && document.activeElement !== stage) {
+      e.preventDefault();
+      roll();
+    }
+  });
+})();
+</script>
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+}
+</script>
+</body>
+</html>
