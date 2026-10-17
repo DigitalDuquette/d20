@@ -6,7 +6,7 @@ A d20 dice roller PWA served from GitHub Pages (https://digitalduquette.github.i
 
 - Design for Campaign Mode: `docs/campaign/README.md`. It's the source of truth; update it when a decision changes.
 - Native iPhone app plan: `docs/ios/README.md`.
-- Work items: GitHub issues. Campaign Mode is tracking issue #32 with sub-issues #33–#57 (label `campaign`, phase labels `campaign: 0 foundations` to `campaign: 5 apple`). The iPhone plan is #1–#31 (label `ios`, `phase: 1 setup` to `phase: 8 ship`). Each issue has a "Done when" checklist; tick it as work lands.
+- Work items: GitHub issues. Campaign Mode is tracking issue #32 with sub-issues #33–#58 (label `campaign`, phase labels `campaign: 0 foundations` to `campaign: 5 apple`). The iPhone plan is #1–#31 (label `ios`, `phase: 1 setup` to `phase: 8 ship`). Each issue has a "Done when" checklist; tick it as work lands.
 - Milestones group issues by phase (`Campaign 0 · Foundations` … `Campaign 5 · Apple Intelligence`, `iOS 1 · Setup` … `iOS 8 · Ship`).
 - Issue #33 is the plan sign-off. Don't start building Campaign Mode until it's closed.
 
