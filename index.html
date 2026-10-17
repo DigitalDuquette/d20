@@ -30,19 +30,20 @@
   --crit: #a0761a;
   --fumble: #a33a2e;
   --chip: #c7d0c6;
+  --on-accent: #ffffff;
   --display: "Cinzel", "Trajan Pro", Georgia, serif;
   --body: "Figtree", system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --bg: #121714; --felt: #1a221d; --fg: #e9ede7; --muted: #94a199;
-    --accent: #b9adf2; --crit: #e2b44f; --fumble: #ef7a6b; --chip: #26302a;
+    --accent: #b9adf2; --crit: #e2b44f; --fumble: #ef7a6b; --chip: #26302a; --on-accent: #1a1530;
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
   --bg: #121714; --felt: #1a221d; --fg: #e9ede7; --muted: #94a199;
-  --accent: #b9adf2; --crit: #e2b44f; --fumble: #ef7a6b; --chip: #26302a;
+  --accent: #b9adf2; --crit: #e2b44f; --fumble: #ef7a6b; --chip: #26302a; --on-accent: #1a1530;
   color-scheme: dark;
 }
 html, body { height: 100%; margin: 0; }
@@ -139,6 +140,35 @@ body {
 #history span.enter { animation: drop .3s ease-out; }
 @keyframes drop { from { transform: translateY(-100%); opacity: 0 } to { transform: none; opacity: 1 } }
 #history span.hint { font-family: var(--body); font-size: 13px; font-weight: 400; color: var(--muted); }
+#controls {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 4px;
+}
+.seg, .mod {
+  display: flex;
+  align-items: center;
+  background: var(--chip);
+  border-radius: 10px;
+  padding: 3px;
+}
+#controls button {
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font: 600 13px var(--body);
+  min-height: 36px;
+  border-radius: 8px;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+#controls button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.seg button { padding: 0 12px; letter-spacing: .03em; }
+#controls .seg button[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); }
+.mod button { width: 40px; font-size: 22px; color: var(--fg); }
+.mod output { min-width: 3ch; text-align: center; font: 600 15px var(--body); font-variant-numeric: tabular-nums; }
 @media (prefers-reduced-motion: reduce) { #result.pop, #history span.enter { animation: none; } }
 </style>
 </head>
@@ -147,6 +177,18 @@ body {
 <button id="stage" type="button" aria-label="Roll the d20"></button>
 <div id="result" aria-live="polite">20</div>
 <div id="label">Tap the die to roll</div>
+<div id="controls">
+  <div class="seg" role="group" aria-label="Roll mode">
+    <button type="button" data-mode="dis">Disadv</button>
+    <button type="button" data-mode="normal">Normal</button>
+    <button type="button" data-mode="adv">Adv</button>
+  </div>
+  <div class="mod" role="group" aria-label="Modifier">
+    <button type="button" data-step="-1" aria-label="Lower modifier">&minus;</button>
+    <output id="mod" aria-live="polite">+0</output>
+    <button type="button" data-step="1" aria-label="Raise modifier">+</button>
+  </div>
+</div>
 <div id="history"><span class="hint">Last rolls show here</span></div>
 
 <script src="vendor/three.min.js"></script>
@@ -156,6 +198,7 @@ body {
   const resultEl = document.getElementById('result');
   const labelEl = document.getElementById('label');
   const historyEl = document.getElementById('history');
+  const modEl = document.getElementById('mod');
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   try { await document.fonts.load('800 100px Cinzel'); } catch (e) {}
@@ -187,12 +230,15 @@ body {
   grad.addColorStop(1, 'rgba(0,0,0,0)');
   sctx.fillStyle = grad;
   sctx.fillRect(0, 0, 128, 128);
-  const shadow = new THREE.Mesh(
-    new THREE.PlaneGeometry(2.4, 0.7),
-    new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(shadowCanvas), transparent: true, depthWrite: false })
-  );
-  shadow.position.set(0, -1.45, -0.5);
-  scene.add(shadow);
+  const shadowTex = new THREE.CanvasTexture(shadowCanvas);
+  function makeShadow() {
+    const m = new THREE.Mesh(
+      new THREE.PlaneGeometry(2.4, 0.7),
+      new THREE.MeshBasicMaterial({ map: shadowTex, transparent: true, depthWrite: false })
+    );
+    scene.add(m);
+    return m;
+  }
 
   // Build the icosahedron with one material per face
   const base = new THREE.IcosahedronGeometry(1.15, 0);
@@ -282,11 +328,19 @@ body {
     return tex;
   }
 
-  const materials = faces.map(f => new THREE.MeshStandardMaterial({
-    map: faceTexture(f.value), roughness: 0.32, metalness: 0.08, flatShading: true
-  }));
-  const die = new THREE.Mesh(geo, materials);
-  scene.add(die);
+  const textures = faces.map(f => faceTexture(f.value));
+  // Two dice: the second only shows for advantage and disadvantage.
+  const dice = [0, 1].map(() => {
+    const mesh = new THREE.Mesh(geo, textures.map(map => new THREE.MeshStandardMaterial({
+      map, roughness: 0.32, metalness: 0.08, flatShading: true
+    })));
+    scene.add(mesh);
+    return { mesh, shadow: makeShadow(), x: 0, s: 1 };
+  });
+
+  function setDim(d, on) {
+    d.mesh.material.forEach(m => { m.transparent = on; m.opacity = on ? 0.35 : 1; });
+  }
 
   // Orientation that shows a given face to the camera, numeral upright, with a slight tilt
   const tilt = new THREE.Quaternion().setFromEuler(new THREE.Euler(-0.2, 0.16, 0));
@@ -314,53 +368,113 @@ body {
   window.addEventListener('resize', resize);
   resize();
 
+  // Roll settings, remembered between visits
+  let mode = 'normal';
+  let mod = 0;
+  try {
+    const m = localStorage.getItem('d20.mode');
+    if (m === 'adv' || m === 'dis') mode = m;
+    mod = Math.max(-20, Math.min(20, parseInt(localStorage.getItem('d20.mod'), 10) || 0));
+  } catch (e) {}
+  function save() {
+    try { localStorage.setItem('d20.mode', mode); localStorage.setItem('d20.mod', mod); } catch (e) {}
+  }
+  const signed = n => (n < 0 ? '\u2212' : '+') + Math.abs(n);
+
+  function layout() {
+    const two = mode !== 'normal';
+    dice.forEach((d, i) => {
+      d.x = two ? (i ? 0.86 : -0.86) : 0;
+      d.s = two ? 0.72 : 1;
+      d.mesh.visible = d.shadow.visible = i === 0 || two;
+      d.mesh.position.x = d.x;
+      d.mesh.scale.setScalar(d.s);
+      d.shadow.position.set(d.x, -1.45 * d.s, -0.5);
+      d.shadow.scale.set(d.s, d.s, 1);
+      d.shadow.material.opacity = 1;
+      setDim(d, false);
+    });
+    document.querySelectorAll('.seg button').forEach(b => b.setAttribute('aria-pressed', b.dataset.mode === mode));
+    modEl.textContent = signed(mod);
+    stage.setAttribute('aria-label', mode === 'adv' ? 'Roll with advantage' : mode === 'dis' ? 'Roll with disadvantage' : 'Roll the d20');
+  }
+
+  document.querySelectorAll('.seg button').forEach(b => b.addEventListener('click', () => {
+    if (anim || b.dataset.mode === mode) return;
+    mode = b.dataset.mode;
+    save();
+    layout();
+  }));
+  document.querySelectorAll('.mod button').forEach(b => b.addEventListener('click', () => {
+    mod = Math.max(-20, Math.min(20, mod + Number(b.dataset.step)));
+    save();
+    modEl.textContent = signed(mod);
+  }));
+
   // Start showing 20
   const startFace = faces.findIndex(f => f.value === 20);
-  die.quaternion.copy(showFace(startFace));
+  dice.forEach(d => d.mesh.quaternion.copy(showFace(startFace)));
 
   let anim = null;
+  layout();
 
   function roll() {
     if (anim) return;
-    const value = randInt(20) + 1;
-    const idx = faces.findIndex(f => f.value === value);
-    const axis = new THREE.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).normalize();
-    anim = {
-      t0: performance.now(),
-      dur: reduceMotion ? 250 : 1500,
-      from: die.quaternion.clone(),
-      to: showFace(idx),
-      axis,
-      turns: reduceMotion ? 0 : 3 + randInt(2),
-      value
-    };
+    const count = mode === 'normal' ? 1 : 2;
+    const rolls = [];
+    for (let i = 0; i < count; i++) {
+      const value = randInt(20) + 1;
+      setDim(dice[i], false);
+      rolls.push({
+        value,
+        from: dice[i].mesh.quaternion.clone(),
+        to: showFace(faces.findIndex(f => f.value === value)),
+        axis: new THREE.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).normalize(),
+        turns: reduceMotion ? 0 : 3 + randInt(2),
+        phase: i * 0.12
+      });
+    }
+    anim = { t0: performance.now(), dur: reduceMotion ? 250 : 1500, rolls };
     resultEl.textContent = '';
     resultEl.className = '';
     labelEl.textContent = 'Rolling…';
     labelEl.className = '';
   }
 
-  function finish(value) {
-    resultEl.textContent = value;
-    const cls = value === 20 ? 'crit' : value === 1 ? 'fumble' : '';
+  function finish(values) {
+    let natural = values[0];
+    let detail = '';
+    if (values.length === 2) {
+      natural = mode === 'adv' ? Math.max(...values) : Math.min(...values);
+      const kept = values[0] === natural ? 0 : 1;
+      setDim(dice[1 - kept], true);
+      detail = natural + ' (' + values[1 - kept] + ' dropped)';
+    }
+    if (mod) detail = (detail || natural) + ' ' + signed(mod).replace(/^(.)/, '$1 ');
+    const total = natural + mod;
+
+    resultEl.textContent = total;
+    const cls = natural === 20 ? 'crit' : natural === 1 ? 'fumble' : '';
     resultEl.className = cls;
     void resultEl.offsetWidth;
     resultEl.classList.add('pop');
     labelEl.className = cls;
-    labelEl.textContent = value === 20 ? 'Natural 20' : value === 1 ? 'Natural 1' : 'Tap to roll again';
+    const nat = natural === 20 ? 'Natural 20' : natural === 1 ? 'Natural 1' : '';
+    labelEl.textContent = [nat, detail].filter(Boolean).join(' · ') || 'Tap to roll again';
 
     // Newest roll goes on top and pushes the older ones down.
     const hint = historyEl.querySelector('.hint');
     if (hint) hint.remove();
     const s = document.createElement('span');
-    s.textContent = value;
-    if (value === 20) s.className = 'crit';
-    if (value === 1) s.className = 'fumble';
+    s.textContent = total;
+    if (detail) s.title = detail;
+    if (natural === 20) s.className = 'crit';
+    if (natural === 1) s.className = 'fumble';
     s.classList.add('enter');
     historyEl.prepend(s);
     historyEl.scrollTop = 0;
     while (historyEl.children.length > 50) historyEl.lastChild.remove();
-    try { navigator.vibrate && navigator.vibrate(value === 20 ? [30, 40, 30] : 20); } catch (e) {}
+    try { navigator.vibrate && navigator.vibrate(natural === 20 ? [30, 40, 30] : 20); } catch (e) {}
   }
 
   const easeOut = t => 1 - Math.pow(1 - t, 3);
@@ -372,26 +486,30 @@ body {
     if (anim) {
       const t = Math.min(1, (now - anim.t0) / anim.dur);
       const e = easeOut(t);
-      tmp.copy(anim.from).slerp(anim.to, e);
-      spin.setFromAxisAngle(anim.axis, anim.turns * Math.PI * 2 * (1 - e));
-      die.quaternion.copy(spin).multiply(tmp);
+      anim.rolls.forEach((r, i) => {
+        const d = dice[i];
+        tmp.copy(r.from).slerp(r.to, e);
+        spin.setFromAxisAngle(r.axis, r.turns * Math.PI * 2 * (1 - e));
+        d.mesh.quaternion.copy(spin).multiply(tmp);
 
-      // bounces: decaying hops
-      const hop = reduceMotion ? 0 : Math.abs(Math.sin(t * Math.PI * 3)) * Math.pow(1 - t, 1.6) * 0.9;
-      die.position.y = hop;
-      const s = 1 - hop * 0.35;
-      shadow.scale.set(s, s, 1);
-      shadow.material.opacity = 1 - hop * 0.6;
+        // bounces: decaying hops, the second die slightly out of step
+        const tp = Math.min(1, t + r.phase * (1 - t));
+        const hop = reduceMotion ? 0 : Math.abs(Math.sin(tp * Math.PI * 3)) * Math.pow(1 - t, 1.6) * 0.9 * d.s;
+        d.mesh.position.y = hop;
+        const s = d.s * (1 - hop * 0.35);
+        d.shadow.scale.set(s, s, 1);
+        d.shadow.material.opacity = 1 - hop * 0.6;
+      });
 
       if (t >= 1) {
-        die.position.y = 0;
-        const v = anim.value;
+        dice.forEach(d => { d.mesh.position.y = 0; });
+        const values = anim.rolls.map(r => r.value);
         anim = null;
-        finish(v);
+        finish(values);
       }
     } else if (!reduceMotion) {
       idleT += 0.016;
-      die.position.y = Math.sin(idleT * 1.6) * 0.03;
+      dice.forEach((d, i) => { d.mesh.position.y = Math.sin(idleT * 1.6 + i * 1.3) * 0.03 * d.s; });
     }
     renderer.render(scene, camera);
     requestAnimationFrame(frame);
@@ -400,7 +518,8 @@ body {
 
   stage.addEventListener('click', roll);
   document.addEventListener('keydown', e => {
-    if ((e.code === 'Space' || e.code === 'Enter') && document.activeElement !== stage) {
+    // Buttons handle their own Space and Enter.
+    if ((e.code === 'Space' || e.code === 'Enter') && !(document.activeElement instanceof HTMLButtonElement)) {
       e.preventDefault();
       roll();
     }
