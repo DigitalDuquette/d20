@@ -20,7 +20,7 @@
 @font-face { font-family: "Figtree"; font-weight: 400; font-display: swap; src: url("fonts/figtree-latin-400-normal.woff2") format("woff2"); }
 @font-face { font-family: "Figtree"; font-weight: 600; font-display: swap; src: url("fonts/figtree-latin-600-normal.woff2") format("woff2"); }
 
-/* One-screen table: the die sits centered on a felt ground, result below, roll history as a quiet strip. */
+/* One-screen table: the die sits centered on a felt ground, result below, roll history as a list under it, newest on top. */
 :root {
   --bg: #e4e8e2;
   --felt: #d3dbd2;
@@ -66,6 +66,7 @@ body {
   user-select: none;
 }
 #stage {
+  flex: none;
   width: min(380px, 100%);
   aspect-ratio: 1;
   max-width: 100%;
@@ -104,28 +105,41 @@ body {
 #label.fumble { color: var(--fumble); }
 #history {
   display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 6px;
-  min-height: 28px;
-  max-width: 380px;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  flex: 0 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  width: min(380px, 100%);
   margin-top: 8px;
+  padding-bottom: 8px;
+  -webkit-mask-image: linear-gradient(to bottom, #000 80%, transparent);
+  mask-image: linear-gradient(to bottom, #000 80%, transparent);
 }
 #history span {
+  flex: none;
   font-variant-numeric: tabular-nums;
   font-size: 13px;
   font-weight: 600;
+  line-height: 1.2;
   min-width: 2.2em;
   text-align: center;
-  padding: 4px 6px;
+  padding: 2px 6px;
   border-radius: 6px;
-  background: var(--chip);
   color: var(--muted);
+  transition: font-size .25s ease-out;
 }
+/* Newest three read larger, stepping down to the plain list. */
+#history span:nth-child(1) { font-family: var(--display); font-weight: 800; font-size: 30px; color: var(--fg); }
+#history span:nth-child(2) { font-family: var(--display); font-weight: 800; font-size: 23px; color: var(--fg); }
+#history span:nth-child(3) { font-family: var(--display); font-weight: 800; font-size: 18px; }
 #history span.crit { color: var(--crit); }
 #history span.fumble { color: var(--fumble); }
-#history .hint { background: none; color: var(--muted); font-weight: 400; }
-@media (prefers-reduced-motion: reduce) { #result.pop { animation: none; } }
+#history span.enter { animation: drop .3s ease-out; }
+@keyframes drop { from { transform: translateY(-100%); opacity: 0 } to { transform: none; opacity: 1 } }
+#history span.hint { font-family: var(--body); font-size: 13px; font-weight: 400; color: var(--muted); }
+@media (prefers-reduced-motion: reduce) { #result.pop, #history span.enter { animation: none; } }
 </style>
 </head>
 <body>
@@ -305,7 +319,6 @@ body {
   die.quaternion.copy(showFace(startFace));
 
   let anim = null;
-  const history = [];
 
   function roll() {
     if (anim) return;
@@ -336,16 +349,17 @@ body {
     labelEl.className = cls;
     labelEl.textContent = value === 20 ? 'Natural 20' : value === 1 ? 'Natural 1' : 'Tap to roll again';
 
-    history.unshift(value);
-    if (history.length > 12) history.pop();
-    historyEl.innerHTML = '';
-    history.forEach(v => {
-      const s = document.createElement('span');
-      s.textContent = v;
-      if (v === 20) s.className = 'crit';
-      if (v === 1) s.className = 'fumble';
-      historyEl.appendChild(s);
-    });
+    // Newest roll goes on top and pushes the older ones down.
+    const hint = historyEl.querySelector('.hint');
+    if (hint) hint.remove();
+    const s = document.createElement('span');
+    s.textContent = value;
+    if (value === 20) s.className = 'crit';
+    if (value === 1) s.className = 'fumble';
+    s.classList.add('enter');
+    historyEl.prepend(s);
+    historyEl.scrollTop = 0;
+    while (historyEl.children.length > 50) historyEl.lastChild.remove();
     try { navigator.vibrate && navigator.vibrate(value === 20 ? [30, 40, 30] : 20); } catch (e) {}
   }
 
