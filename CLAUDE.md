@@ -10,6 +10,13 @@ A d20 dice roller PWA served from GitHub Pages (https://digitalduquette.github.i
 - Milestones group issues by phase (`Campaign 0 · Foundations` … `Campaign 5 · Apple Intelligence`, `iOS 1 · Setup` … `iOS 8 · Ship`).
 - Issue #33 is the plan sign-off. Don't start building Campaign Mode until it's closed.
 
+## GitHub Project board
+
+- The board is GitHub Project #3 ("d20") owned by the user DigitalDuquette. It isn't populated yet.
+- Work it with the `gh` CLI. The token needs the project scope: `gh auth refresh -s project`.
+- Useful commands: `gh project view 3 --owner DigitalDuquette`, `gh project field-list 3 --owner DigitalDuquette`, `gh project item-add 3 --owner DigitalDuquette --url <issue url>`, `gh project item-list 3 --owner DigitalDuquette`.
+- Goal state: every open issue on the board, with Status set (closed issues Done), grouped or sliced by milestone. Milestones already exist in the repo and every issue except #32 has one.
+
 ## How the app is built
 
 - No build step. `index.html` is the dice app; three.js is vendored in `vendor/`. Campaign Mode code goes in ES modules under `campaign/`, and third-party code is vendored the same way.
@@ -24,6 +31,7 @@ A d20 dice roller PWA served from GitHub Pages (https://digitalduquette.github.i
 - The AI never writes the player character's speech, thoughts, feelings or choices.
 - The API key is user-supplied and stays on the device. Never put it in campaign data, exports, logs, error messages or the service-worker cache. Never commit a key.
 - Public issues, docs and test fixtures use made-up examples only. The owner's real campaigns and characters stay out of the repo.
+- No D&D trademarks or other companies' setting content in the product. Mechanics are written in our own words; any SRD text copied needs CC-BY-4.0 credit (see "Rules and trademarks" in the design doc).
 
 ## Working conventions
 

@@ -205,6 +205,13 @@ Unit tests can't tell whether the AI is a good game master, so there's a small e
 
 Validator checks are automatic. Judgment checks are graded by a second model call against a written rubric. The eval runs against your API key only when you ask, and each run's cost is shown first. Fixtures are recorded, so the app's code paths can be tested offline without calling any model.
 
+## Rules and trademarks
+
+- The rules use only general d20 mechanics (a d20 plus a modifier against a target, six abilities, advantage and disadvantage), written in our own words. Game mechanics aren't protected by copyright.
+- No D&D trademarks anywhere in the product: not "Dungeons & Dragons" or "D&D" in the app name, icon, store listing or marketing, and none of its setting-specific creatures or places.
+- If any text is copied from the D&D System Reference Document (SRD 5.1 or 5.2, both under CC-BY-4.0), the app credits it in an About screen with the attribution the SRD specifies.
+- The same goes for other games and franchises. A player can name any setting for their own campaign, but the app and repo never ship another company's setting, names or lore.
+
 ## Privacy
 
 - Campaign content stays on the device unless you export it.
