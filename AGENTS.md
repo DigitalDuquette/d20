@@ -20,6 +20,7 @@ game master for solo role-play.
 
 - No build step. `index.html` is the dice app. Third-party code is vendored in
   `vendor/`. Campaign Mode code goes in ES modules under `campaign/`.
+- The iPhone app is a SwiftUI Xcode project in `ios/TapD20`.
 - `sw.js` is the offline cache. Bump `VERSION` and update `FILES` when a cached
   file is added or changed.
 - Run locally: `python3 -m http.server 8000`, then open http://localhost:8000.

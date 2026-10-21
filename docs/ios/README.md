@@ -2,7 +2,29 @@
 
 Plan for a native SwiftUI version of the web app. The work is tracked as issues labeled `ios` (#1 to #31), grouped by the `iOS 1` to `iOS 8` milestones. These wireframes show what each screen should look like.
 
-Open decision before #5 starts: Campaign Mode's Apple Intelligence provider (#57) needs the iPhone app to host the web app in a web view. That means choosing between this full SwiftUI rewrite, a web-view shell for everything, or SwiftUI dice with a web-view campaign screen. Most of #6 to #28 change if the answer is a web-view shell.
+The app is a full SwiftUI rewrite, not a web-view wrapper (decided in #5).
+
+## Project
+
+- Xcode project: `ios/TapD20/TapD20.xcodeproj`.
+- Minimum iOS version: iOS 17. iPhone only, portrait.
+- Bundle ID: `com.digitalduquette.tapd20`.
+- Source files go in `ios/TapD20/TapD20/`. Xcode picks up new files in that
+  folder by itself.
+
+## Run on your iPhone (free Apple ID)
+
+1. Open `ios/TapD20/TapD20.xcodeproj` in Xcode.
+2. Select the TapD20 target. In Signing & Capabilities, set Team to your
+   Personal Team.
+3. Connect the iPhone and turn on Developer Mode
+   (Settings > Privacy & Security).
+4. Select the iPhone as the run destination and press Run.
+5. On the iPhone, trust your profile in
+   Settings > General > VPN & Device Management.
+
+With a free Apple ID, the app stops opening after 7 days. Run it from Xcode
+again to reinstall it.
 
 | Roll | Advantage | Dice picker | Damage roll |
 | --- | --- | --- | --- |
