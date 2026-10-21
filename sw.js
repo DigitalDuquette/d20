@@ -1,5 +1,5 @@
 // Offline cache. Bump VERSION whenever any cached file changes.
-const VERSION = 'd20-v4';
+const VERSION = 'd20-v5';
 const FILES = [
   './',
   'index.html',

@@ -80,7 +80,9 @@ body {
   touch-action: manipulation;
 }
 #stage:focus-visible { outline: 3px solid var(--accent); outline-offset: 4px; }
-#stage canvas { width: 100% !important; height: 100% !important; display: block; }
+#stage canvas { width: 100% !important; height: 100% !important; display: block; transition: filter .4s; }
+#stage.crit canvas { filter: drop-shadow(0 0 18px var(--crit)); }
+#stage.fumble canvas { filter: saturate(.35) brightness(.8) drop-shadow(0 0 16px var(--fumble)); }
 #result {
   font-family: var(--display);
   font-weight: 800;
@@ -188,6 +190,12 @@ body {
     <output id="mod" aria-live="polite">+0</output>
     <button type="button" data-step="1" aria-label="Raise modifier">+</button>
   </div>
+  <div class="seg" role="group" aria-label="Die style">
+    <button type="button" data-style="amethyst">Amethyst</button>
+    <button type="button" data-style="obsidian">Obsidian</button>
+    <button type="button" data-style="quartz">Quartz</button>
+    <button type="button" data-style="steel">Steel</button>
+  </div>
 </div>
 <div id="history"><span class="hint">Last rolls show here</span></div>
 
@@ -201,15 +209,50 @@ body {
   const modEl = document.getElementById('mod');
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  try { await document.fonts.load('800 100px Cinzel'); } catch (e) {}
+  try { await Promise.all([document.fonts.load('800 100px Cinzel'), document.fonts.load('600 100px Figtree')]); } catch (e) {}
+
+  // Die looks, from the dice design canvas. mat goes straight into MeshPhysicalMaterial.
+  const CINZEL = '800 {px}px Cinzel, Georgia, serif';
+  const FIGTREE = '600 {px}px Figtree, system-ui, sans-serif';
+  const STYLES = {
+    amethyst: { top: '#5a4ca6', bot: '#2c2458', ink: '#f3eee0', crit: '#f2cf74', edge: 'rgba(200,190,255,0.22)', shadow: 'rgba(0,0,0,0.45)', font: CINZEL, rim: 0xc9c0ff,
+      mat: { roughness: 0.32, metalness: 0.08, envMapIntensity: 0.5 } },
+    obsidian: { top: '#2e2e35', bot: '#0b0b0e', ink: '#e2b44f', crit: '#f2cf74', edge: 'rgba(226,180,79,0.6)', shadow: 'rgba(0,0,0,0.6)', font: CINZEL, rim: 0xe2b44f,
+      mat: { roughness: 0.1, metalness: 0.1, clearcoat: 1, clearcoatRoughness: 0.05, envMapIntensity: 1.2 } },
+    quartz: { top: '#e6f4f6', bot: '#86b9c6', ink: '#1d4a56', crit: '#a0761a', edge: 'rgba(255,255,255,0.85)', shadow: 'rgba(255,255,255,0.5)', font: FIGTREE, rim: 0xffffff,
+      mat: { roughness: 0.05, metalness: 0, clearcoat: 1, envMapIntensity: 1.4, transparent: true, opacity: 0.62, depthWrite: false } },
+    steel: { top: '#d9dde0', bot: '#7b838a', ink: '#2a2f33', crit: '#8a5d00', edge: 'rgba(255,255,255,0.7)', shadow: 'rgba(255,255,255,0.45)', font: FIGTREE, rim: 0xffffff, brushed: true,
+      mat: { roughness: 0.35, metalness: 0.85, envMapIntensity: 1.1 } }
+  };
 
   // Renderer
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 3));
   renderer.outputEncoding = THREE.sRGBEncoding;
   stage.appendChild(renderer.domElement);
 
   const scene = new THREE.Scene();
+
+  // Soft studio reflections so glass and metal have something to reflect.
+  const envCv = document.createElement('canvas');
+  envCv.width = 512; envCv.height = 256;
+  const ectx = envCv.getContext('2d');
+  const eg = ectx.createLinearGradient(0, 0, 0, 256);
+  eg.addColorStop(0, '#ffffff');
+  eg.addColorStop(0.45, '#8a8f99');
+  eg.addColorStop(1, '#1c1f22');
+  ectx.fillStyle = eg;
+  ectx.fillRect(0, 0, 512, 256);
+  ectx.fillStyle = 'rgba(255,255,255,0.9)';
+  ectx.fillRect(60, 40, 90, 50);
+  ectx.fillRect(300, 60, 140, 30);
+  const envTex = new THREE.CanvasTexture(envCv);
+  envTex.mapping = THREE.EquirectangularReflectionMapping;
+  envTex.encoding = THREE.sRGBEncoding;
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  scene.environment = pmrem.fromEquirectangular(envTex).texture;
+  envTex.dispose();
+  pmrem.dispose();
   const camera = new THREE.PerspectiveCamera(32, 1, 0.1, 50);
   camera.position.set(0, 0, 6.2);
 
@@ -284,16 +327,22 @@ body {
     next++;
   }
 
-  function faceTexture(n) {
-    const S = 256;
+  function faceTexture(n, st) {
+    const S = 512, k = S / 256;
     const cv = document.createElement('canvas');
     cv.width = cv.height = S;
     const ctx = cv.getContext('2d');
     const g = ctx.createLinearGradient(0, 0, 0, S * H);
-    g.addColorStop(0, '#4b3e8c');
-    g.addColorStop(1, '#2c2458');
+    g.addColorStop(0, st.top);
+    g.addColorStop(1, st.bot);
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, S, S);
+    if (st.brushed) {
+      for (let i = 0; i < 700; i++) {
+        ctx.fillStyle = Math.random() < 0.5 ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.06)';
+        ctx.fillRect(0, Math.random() * S, S, k * 0.5);
+      }
+    }
     // inner triangle line for a cut-edge look
     const cy = (1 - (vTop + vBot * 2) / 3) * S;
     ctx.save();
@@ -305,22 +354,21 @@ body {
     ctx.lineTo(0, S * H);
     ctx.lineTo(S, S * H);
     ctx.closePath();
-    ctx.strokeStyle = 'rgba(255,255,255,0.10)';
-    ctx.lineWidth = 3;
+    ctx.strokeStyle = st.edge;
+    ctx.lineWidth = 3 * k;
     ctx.stroke();
     ctx.restore();
 
-    const isMax = n === 20, isOne = n === 1;
-    ctx.fillStyle = isMax ? '#f2cf74' : '#f3eee0';
+    ctx.fillStyle = n === 20 ? st.crit : st.ink;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.font = `800 ${n >= 10 ? 76 : 86}px Cinzel, Georgia, serif`;
-    ctx.shadowColor = 'rgba(0,0,0,0.45)';
-    ctx.shadowBlur = 4;
-    ctx.shadowOffsetY = 2;
-    ctx.fillText(String(n), S / 2, cy + 6);
+    ctx.font = st.font.replace('{px}', (n >= 10 ? 76 : 86) * k);
+    ctx.shadowColor = st.shadow;
+    ctx.shadowBlur = 4 * k;
+    ctx.shadowOffsetY = 2 * k;
+    ctx.fillText(String(n), S / 2, cy + 6 * k);
     if (n === 6 || n === 9) {
-      ctx.fillRect(S / 2 - 18, cy + 44, 36, 6);
+      ctx.fillRect(S / 2 - 18 * k, cy + 44 * k, 36 * k, 6 * k);
     }
     const tex = new THREE.CanvasTexture(cv);
     tex.encoding = THREE.sRGBEncoding;
@@ -328,18 +376,44 @@ body {
     return tex;
   }
 
-  const textures = faces.map(f => faceTexture(f.value));
   // Two dice: the second only shows for advantage and disadvantage.
+  // Each has a back-face child, drawn first, so the clear style shows its far side.
   const dice = [0, 1].map(() => {
-    const mesh = new THREE.Mesh(geo, textures.map(map => new THREE.MeshStandardMaterial({
-      map, roughness: 0.32, metalness: 0.08, flatShading: true
-    })));
+    const mesh = new THREE.Mesh(geo, []);
+    const back = new THREE.Mesh(geo, []);
+    back.renderOrder = -1;
+    mesh.add(back);
     scene.add(mesh);
-    return { mesh, shadow: makeShadow(), x: 0, s: 1 };
+    return { mesh, back, shadow: makeShadow(), x: 0, s: 1 };
   });
 
+  let style = 'amethyst';
+  let textures = [];
+  function applyStyle() {
+    const st = STYLES[style];
+    textures.forEach(t => t.dispose());
+    textures = faces.map(f => faceTexture(f.value, st));
+    rim.color.setHex(st.rim);
+    const make = (side, o) => textures.map(map => {
+      const m = new THREE.MeshPhysicalMaterial({ map, flatShading: true, ...st.mat, side, opacity: o });
+      m.userData.o = o;
+      return m;
+    });
+    dice.forEach(d => {
+      [d.mesh, d.back].forEach(m => m.material.forEach(x => x.dispose()));
+      const o = st.mat.opacity || 1;
+      d.mesh.material = make(THREE.FrontSide, o);
+      d.back.material = make(THREE.BackSide, o * 0.6);
+      d.back.visible = !!st.mat.transparent;
+    });
+    document.querySelectorAll('[data-style]').forEach(b => b.setAttribute('aria-pressed', b.dataset.style === style));
+  }
+
   function setDim(d, on) {
-    d.mesh.material.forEach(m => { m.transparent = on; m.opacity = on ? 0.35 : 1; });
+    [d.mesh, d.back].forEach(mesh => mesh.material.forEach(m => {
+      m.transparent = on || !!STYLES[style].mat.transparent;
+      m.opacity = m.userData.o * (on ? 0.35 : 1);
+    }));
   }
 
   // Orientation that shows a given face to the camera, numeral upright, with a slight tilt
@@ -375,10 +449,13 @@ body {
     const m = localStorage.getItem('d20.mode');
     if (m === 'adv' || m === 'dis') mode = m;
     mod = Math.max(-20, Math.min(20, parseInt(localStorage.getItem('d20.mod'), 10) || 0));
+    const s = localStorage.getItem('d20.style');
+    if (STYLES[s]) style = s;
   } catch (e) {}
   function save() {
-    try { localStorage.setItem('d20.mode', mode); localStorage.setItem('d20.mod', mod); } catch (e) {}
+    try { localStorage.setItem('d20.mode', mode); localStorage.setItem('d20.mod', mod); localStorage.setItem('d20.style', style); } catch (e) {}
   }
+  applyStyle();
   const signed = n => (n < 0 ? '\u2212' : '+') + Math.abs(n);
 
   function layout() {
@@ -394,15 +471,22 @@ body {
       d.shadow.material.opacity = 1;
       setDim(d, false);
     });
-    document.querySelectorAll('.seg button').forEach(b => b.setAttribute('aria-pressed', b.dataset.mode === mode));
+    document.querySelectorAll('[data-mode]').forEach(b => b.setAttribute('aria-pressed', b.dataset.mode === mode));
     modEl.textContent = signed(mod);
     stage.setAttribute('aria-label', mode === 'adv' ? 'Roll with advantage' : mode === 'dis' ? 'Roll with disadvantage' : 'Roll the d20');
   }
 
-  document.querySelectorAll('.seg button').forEach(b => b.addEventListener('click', () => {
+  document.querySelectorAll('[data-mode]').forEach(b => b.addEventListener('click', () => {
     if (anim || b.dataset.mode === mode) return;
     mode = b.dataset.mode;
     save();
+    layout();
+  }));
+  document.querySelectorAll('[data-style]').forEach(b => b.addEventListener('click', () => {
+    if (anim || b.dataset.style === style) return;
+    style = b.dataset.style;
+    save();
+    applyStyle();
     layout();
   }));
   document.querySelectorAll('.mod button').forEach(b => b.addEventListener('click', () => {
@@ -437,6 +521,7 @@ body {
     anim = { t0: performance.now(), dur: reduceMotion ? 250 : 1500, rolls };
     resultEl.textContent = '';
     resultEl.className = '';
+    stage.className = '';
     labelEl.textContent = 'Rolling…';
     labelEl.className = '';
   }
@@ -459,6 +544,7 @@ body {
     void resultEl.offsetWidth;
     resultEl.classList.add('pop');
     labelEl.className = cls;
+    stage.className = cls;
     const nat = natural === 20 ? 'Natural 20' : natural === 1 ? 'Natural 1' : '';
     labelEl.textContent = [nat, detail].filter(Boolean).join(' · ') || 'Tap to roll again';
 
