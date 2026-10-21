@@ -12,6 +12,15 @@ The app is a full SwiftUI rewrite, not a web-view wrapper (decided in #5).
 - Source files go in `ios/TapD20/TapD20/`. Xcode picks up new files in that
   folder by itself.
 
+## Look
+
+- Colors in `Assets.xcassets` copy the tokens in `index.html`, light and
+  dark. Change both together.
+- Fonts in `TapD20/Fonts/` are TTF copies of the web `fonts/` files. They are
+  listed under `UIAppFonts` in `ios/TapD20/Info.plist`. Use the PostScript
+  names: `Cinzel-ExtraBold`, `FigtreeLight-Regular`, `FigtreeLight-SemiBold`.
+- The app icon is the web d20 rendered at 1024px.
+
 ## Run on your iPhone (free Apple ID)
 
 1. Open `ios/TapD20/TapD20.xcodeproj` in Xcode.

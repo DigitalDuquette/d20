@@ -7,12 +7,15 @@ struct ContentView: View {
     var body: some View {
         VStack(spacing: 16) {
             Text("\(roll)")
-                .font(.system(size: 160, weight: .bold, design: .rounded))
+                .font(.custom("Cinzel-ExtraBold", size: 160))
                 .contentTransition(.numericText())
             Text("Tap to roll")
-                .foregroundStyle(.secondary)
+                .font(.custom("FigtreeLight-Regular", size: 17))
+                .foregroundStyle(Color(.muted))
         }
+        .foregroundStyle(Color(.foreground))
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color(.background))
         .contentShape(Rectangle())
         .onTapGesture {
             withAnimation { roll = Int.random(in: 1...20) }
