@@ -21,3 +21,8 @@ Then open http://localhost:8000. Opening `index.html` straight from disk works f
 - `manifest.webmanifest` and `icons/`: home-screen install.
 - `vendor/three.min.js`: three.js r128 (MIT).
 - `fonts/`: Cinzel and Figtree (SIL Open Font License).
+
+## License
+
+MIT. See `LICENSE`. Vendored code and fonts keep their own licenses, listed
+above.
