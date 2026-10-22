@@ -11,6 +11,10 @@ The app is a full SwiftUI rewrite, not a web-view wrapper (decided in #5).
 - Bundle ID: `com.digitalduquette.tapd20`.
 - Source files go in `ios/TapD20/TapD20/`. Xcode picks up new files in that
   folder by itself.
+- Unit tests go in `ios/TapD20/TapD20Tests/` and use Swift Testing. Run
+  them with Cmd+U.
+- The dice engine is `Dice.swift`. `Dice.resolve` turns die values into a
+  result and has no randomness, so tests pass fixed values.
 
 ## Look
 
