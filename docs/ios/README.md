@@ -15,6 +15,9 @@ The app is a full SwiftUI rewrite, not a web-view wrapper (decided in #5).
   them with Cmd+U.
 - The dice engine is `Dice.swift`. `Dice.resolve` turns die values into a
   result and has no randomness, so tests pass fixed values.
+- The 3D die is `D20Geometry.swift` (face maths, tested) and
+  `D20View.swift` (SceneKit scene and roll animation). Both port the web die
+  in `index.html`. The engine picks the values first; the die only shows them.
 
 ## Look
 
