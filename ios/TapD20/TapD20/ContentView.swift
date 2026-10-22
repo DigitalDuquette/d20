@@ -1,49 +1,99 @@
 import SwiftUI
 
-// Roll screen from the Roll and Advantage wireframes. The flat die stands in
-// until the 3D die (#8). History, settings, dice picker and Saved come later.
+// Roll screen from the Roll and Advantage wireframes.
 struct ContentView: View {
     @AppStorage("d20.mode") private var mode = RollMode.normal
     @AppStorage("d20.mod") private var modifier = 0
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var die = D20Scene()
+    @State private var rolling = false
     @State private var result: RollResult?
-    @State private var history: [RollResult] = []
+    @State private var history: [Entry] = []
+
+    private struct Entry: Identifiable {
+        let id = UUID()
+        let result: RollResult
+    }
 
     private var spec: RollSpec { RollSpec(modifier: modifier, mode: mode) }
 
     var body: some View {
         VStack(spacing: 20) {
-            Text("d20")
-                .font(.custom("FigtreeLight-SemiBold", size: 17))
-                .padding(.top, 8)
-
+            topBar
             dice
             resultText
             controls
             historyList
             Spacer(minLength: 0)
+            bottomBar
         }
         .padding(.horizontal, 16)
+        .padding(.bottom, 8)
         .foregroundStyle(Color(.foreground))
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(.background))
+        .onAppear { die.layout(count: spec.diceToRoll) }
+        .onChange(of: spec.diceToRoll) { die.layout(count: spec.diceToRoll) }
+    }
+
+    // shortcut: these four buttons have no action until #16, #20, #23 and #24.
+    private var topBar: some View {
+        HStack {
+            circleButton("clock", "History")
+            Spacer()
+            Text("d20").font(.custom("FigtreeLight-SemiBold", size: 17))
+            Spacer()
+            circleButton("slider.horizontal.3", "Settings")
+        }
+        .padding(.top, 8)
+    }
+
+    private var bottomBar: some View {
+        HStack(spacing: 10) {
+            barButton {
+                Image(systemName: "hexagon")
+                    .overlay(Image(systemName: "triangle").font(.system(size: 8, weight: .bold)))
+                Text("d20")
+                Image(systemName: "chevron.down").font(.system(size: 12, weight: .bold))
+            }
+            .accessibilityLabel("Dice: d20")
+            barButton {
+                Image(systemName: "bookmark")
+                Text("Saved")
+            }
+        }
+    }
+
+    private func circleButton(_ icon: String, _ label: String) -> some View {
+        Button {} label: {
+            Image(systemName: icon)
+                .font(.system(size: 18, weight: .medium))
+                .frame(width: 44, height: 44)
+                .background(Color(.chip), in: Circle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(label)
+    }
+
+    private func barButton(@ViewBuilder _ label: () -> some View) -> some View {
+        Button {} label: {
+            HStack(spacing: 10, content: label)
+                .font(.custom("FigtreeLight-SemiBold", size: 17))
+                .frame(maxWidth: .infinity, minHeight: 52)
+                .background(Color(.chip), in: RoundedRectangle(cornerRadius: 16))
+        }
+        .buttonStyle(.plain)
     }
 
     private var dice: some View {
-        // Show the last roll if it matches the current mode, else blank faces.
-        let shown = result.flatMap { $0.values.count == spec.diceToRoll ? $0 : nil }
-        let values = shown?.values ?? Array(repeating: 20, count: spec.diceToRoll)
-        return Button(action: roll) {
-            HStack(spacing: 24) {
-                ForEach(values.indices, id: \.self) { i in
-                    D20Face(value: values[i])
-                        .opacity(shown?.droppedIndex == i ? 0.35 : 1)
-                }
-            }
-            .frame(height: 250)
-            .frame(maxWidth: .infinity)
-            .contentShape(Rectangle())
+        Button(action: roll) {
+            D20View(die: die)
+                .aspectRatio(1, contentMode: .fit)
+                .frame(maxWidth: .infinity, maxHeight: 280)
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .layoutPriority(-1)
         .accessibilityLabel(mode == .advantage ? "Roll with advantage" : mode == .disadvantage ? "Roll with disadvantage" : "Roll the d20")
     }
 
@@ -54,11 +104,10 @@ struct ContentView: View {
                 .contentTransition(.numericText())
                 .foregroundStyle(tint(result) ?? Color(.foreground))
             Text(label)
-                .font(.custom("FigtreeLight-SemiBold", size: 13))
-                .tracking(1.8)
-                .textCase(.uppercase)
+                .font(.custom("FigtreeLight-SemiBold", size: 15))
                 .foregroundStyle(tint(result) ?? Color(.muted))
         }
+        .opacity(rolling ? 0.3 : 1)
         .accessibilityElement(children: .combine)
     }
 
@@ -77,6 +126,7 @@ struct ContentView: View {
                 Text("Adv").tag(RollMode.advantage)
             }
             .pickerStyle(.segmented)
+            .disabled(rolling)
 
             HStack {
                 Button { step(-1) } label: { Image(systemName: "minus") }
@@ -98,23 +148,33 @@ struct ContentView: View {
 
     private var historyList: some View {
         VStack(spacing: 4) {
-            ForEach(Array(history.enumerated()), id: \.offset) { i, r in
+            ForEach(Array(history.enumerated()), id: \.element.id) { i, entry in
+                let r = entry.result
                 Text("\(r.total)")
                     .font(i < 3 ? .custom("Cinzel-ExtraBold", size: [30, 23, 18][i]) : .custom("FigtreeLight-SemiBold", size: 13))
                     .foregroundStyle(tint(r) ?? (i < 2 ? Color(.foreground) : Color(.muted)))
+                    .transition(.move(edge: .top).combined(with: .opacity))
             }
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("Last rolls: " + history.map { "\($0.total)" }.joined(separator: ", "))
+        .accessibilityLabel("Last rolls: " + history.map { "\($0.result.total)" }.joined(separator: ", "))
     }
 
     private func roll() {
+        guard !rolling else { return }
+        rolling = true
+        // The engine picks the values first; the die only shows them.
         let r = Dice.roll(spec)
-        withAnimation {
-            result = r
-            history.insert(r, at: 0)
-            // shortcut: keeps the last 4 in memory, the history screen (#23) stores more.
-            history = Array(history.prefix(4))
+        Task {
+            await die.roll(r.values, reduceMotion: reduceMotion)
+            die.dim(r.droppedIndex)
+            withAnimation {
+                rolling = false
+                result = r
+                history.insert(Entry(result: r), at: 0)
+                // shortcut: keeps the last 4 in memory, the history screen (#23) stores more.
+                history = Array(history.prefix(4))
+            }
         }
     }
 
@@ -124,60 +184,6 @@ struct ContentView: View {
 
     private func tint(_ r: RollResult?) -> Color? {
         r?.isNatural20 == true ? Color(.crit) : r?.isNatural1 == true ? Color(.fumble) : nil
-    }
-}
-
-/// Flat d20 seen face-on, as in the wireframes.
-struct D20Face: View {
-    let value: Int
-
-    var body: some View {
-        ZStack {
-            D20Shape(part: .body).fill(Color(red: 0x2c / 255, green: 0x24 / 255, blue: 0x58 / 255))
-            D20Shape(part: .face).fill(Color(red: 0x4d / 255, green: 0x40 / 255, blue: 0x8f / 255))
-            D20Shape(part: .edges).stroke(Color(red: 0x7b / 255, green: 0x6c / 255, blue: 0xc9 / 255), lineWidth: 1.5)
-            GeometryReader { g in
-                Text("\(value)")
-                    .font(.custom("Cinzel-ExtraBold", size: g.size.height * 0.15))
-                    .foregroundStyle(value == 20 ? Color(red: 0xf2 / 255, green: 0xcf / 255, blue: 0x74 / 255) : Color(red: 0xf3 / 255, green: 0xee / 255, blue: 0xe0 / 255))
-                    .position(x: g.size.width / 2, y: g.size.height * 0.53)
-            }
-        }
-        .aspectRatio(0.866, contentMode: .fit)
-        .accessibilityHidden(true)
-    }
-}
-
-struct D20Shape: Shape {
-    enum Part { case body, face, edges }
-    let part: Part
-
-    func path(in rect: CGRect) -> Path {
-        func p(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
-            CGPoint(x: rect.minX + x * rect.width, y: rect.minY + y * rect.height)
-        }
-        let outer = [p(0.5, 0), p(1, 0.25), p(1, 0.75), p(0.5, 1), p(0, 0.75), p(0, 0.25)]
-        let inner = [p(0.5, 0.242), p(0.802, 0.683), p(0.198, 0.683)]
-        var path = Path()
-        switch part {
-        case .body:
-            path.addLines(outer)
-            path.closeSubpath()
-        case .face:
-            path.addLines(inner)
-            path.closeSubpath()
-        case .edges:
-            path.addLines(outer)
-            path.closeSubpath()
-            path.addLines(inner)
-            path.closeSubpath()
-            // Outer corner to inner corner: top, upper sides, lower sides, bottom.
-            for (o, i) in [(0, 0), (1, 0), (5, 0), (1, 1), (2, 1), (3, 1), (5, 2), (4, 2), (3, 2)] {
-                path.move(to: outer[o])
-                path.addLine(to: inner[i])
-            }
-        }
-        return path
     }
 }
 
