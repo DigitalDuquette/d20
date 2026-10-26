@@ -4,6 +4,8 @@ import SwiftUI
 struct ContentView: View {
     @AppStorage("d20.mode") private var mode = RollMode.normal
     @AppStorage("d20.mod") private var modifier = 0
+    // shortcut: no toggle until the Settings screen (#24) writes this key.
+    @AppStorage("d20.haptics") private var haptics = true
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var die = D20Scene()
     @State private var rolling = false
@@ -34,6 +36,11 @@ struct ContentView: View {
         .background(Color(.background))
         .onAppear { die.layout(count: spec.diceToRoll) }
         .onChange(of: spec.diceToRoll) { die.layout(count: spec.diceToRoll) }
+        // Matches the web app: a light tap on landing, a double tap on a natural 20.
+        .sensoryFeedback(trigger: history.first?.id) { _, _ in
+            guard haptics, let r = history.first?.result else { return nil }
+            return r.isNatural20 ? .success : .impact(weight: .light)
+        }
     }
 
     // shortcut: these four buttons have no action until #16, #20, #23 and #24.
