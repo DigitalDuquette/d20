@@ -32,6 +32,8 @@ struct ContentView: View {
         }
         .padding(.horizontal, 16)
         .padding(.bottom, 8)
+        // Past this size the die has no room left on the smallest iPhone.
+        .dynamicTypeSize(...DynamicTypeSize.accessibility2)
         .foregroundStyle(Color(.foreground))
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(.background))
@@ -56,7 +58,9 @@ struct ContentView: View {
         HStack {
             circleButton("clock", "History")
             Spacer()
-            Text("d20").font(.custom("FigtreeLight-SemiBold", size: 17))
+            Text("d20")
+                .font(.custom("FigtreeLight-SemiBold", size: 17, relativeTo: .headline))
+                .accessibilityAddTraits(.isHeader)
             Spacer()
             circleButton("slider.horizontal.3", "Settings")
         }
@@ -76,6 +80,7 @@ struct ContentView: View {
                 Image(systemName: "bookmark")
                 Text("Saved")
             }
+            .accessibilityLabel("Saved rolls")
         }
     }
 
@@ -93,7 +98,7 @@ struct ContentView: View {
     private func barButton(@ViewBuilder _ label: () -> some View) -> some View {
         Button {} label: {
             HStack(spacing: 10, content: label)
-                .font(.custom("FigtreeLight-SemiBold", size: 17))
+                .font(.custom("FigtreeLight-SemiBold", size: 17, relativeTo: .body))
                 .frame(maxWidth: .infinity, minHeight: 52)
                 .background(Color(.chip), in: RoundedRectangle(cornerRadius: 16))
         }
@@ -120,11 +125,18 @@ struct ContentView: View {
                 .contentTransition(.numericText())
                 .foregroundStyle(tint(result) ?? Color(.foreground))
             Text(label)
-                .font(.custom("FigtreeLight-SemiBold", size: 15))
+                .font(.custom("FigtreeLight-SemiBold", size: 15, relativeTo: .subheadline))
                 .foregroundStyle(tint(result) ?? Color(.muted))
         }
         .opacity(rolling ? 0.3 : 1)
-        .accessibilityElement(children: .combine)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(result.map(spoken) ?? "No roll yet. Tap the die to roll")
+    }
+
+    /// "21. 18 (9 dropped) + 3", with "Natural 20" first when it is one.
+    private func spoken(_ r: RollResult) -> String {
+        let nat = r.isNatural20 ? "Natural 20" : r.isNatural1 ? "Natural 1" : ""
+        return ["\(r.total)", nat, r.breakdown].filter { !$0.isEmpty }.joined(separator: ". ")
     }
 
     private var label: String {
@@ -134,32 +146,41 @@ struct ContentView: View {
         return text.isEmpty ? "Tap to roll again" : text
     }
 
+    // Side by side, or stacked when large text does not fit on one row.
     private var controls: some View {
-        HStack(spacing: 12) {
-            Picker("Roll mode", selection: $mode) {
-                Text("Disadv").tag(RollMode.disadvantage)
-                Text("Normal").tag(RollMode.normal)
-                Text("Adv").tag(RollMode.advantage)
-            }
-            .pickerStyle(.segmented)
-            .disabled(rolling)
-
-            HStack {
-                Button { step(-1) } label: { Image(systemName: "minus") }
-                Text(Dice.signed(modifier))
-                    .font(.custom("FigtreeLight-SemiBold", size: 17))
-                    .monospacedDigit()
-                    .frame(minWidth: 40)
-                Button { step(1) } label: { Image(systemName: "plus") }
-            }
-            .padding(.horizontal, 14)
-            .frame(height: 32)
-            .background(Color(.chip), in: RoundedRectangle(cornerRadius: 9))
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel("Modifier")
-            .accessibilityValue(Dice.signed(modifier))
-            .accessibilityAdjustableAction { $0 == .increment ? step(1) : step(-1) }
+        ViewThatFits {
+            HStack(spacing: 12) { modePicker; modifierStepper }
+            VStack(spacing: 10) { modePicker; modifierStepper }
         }
+    }
+
+    private var modePicker: some View {
+        Picker("Roll mode", selection: $mode) {
+            Text("Disadv").accessibilityLabel("Disadvantage").tag(RollMode.disadvantage)
+            Text("Normal").tag(RollMode.normal)
+            Text("Adv").accessibilityLabel("Advantage").tag(RollMode.advantage)
+        }
+        .pickerStyle(.segmented)
+        .disabled(rolling)
+    }
+
+    private var modifierStepper: some View {
+        HStack {
+            Button { step(-1) } label: { Image(systemName: "minus") }
+            Text(Dice.signed(modifier))
+                .font(.custom("FigtreeLight-SemiBold", size: 17, relativeTo: .body))
+                .monospacedDigit()
+                .frame(minWidth: 40)
+            Button { step(1) } label: { Image(systemName: "plus") }
+        }
+        .padding(.horizontal, 14)
+        .frame(minHeight: 32)
+        .fixedSize()
+        .background(Color(.chip), in: RoundedRectangle(cornerRadius: 9))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Modifier")
+        .accessibilityValue(Dice.signed(modifier))
+        .accessibilityAdjustableAction { $0 == .increment ? step(1) : step(-1) }
     }
 
     // The rolls before the current one, newest on the left. Swipe for older ones.
@@ -167,7 +188,7 @@ struct ContentView: View {
         let past = history.dropFirst()
         return HStack(spacing: 10) {
             Text("Last:")
-                .font(.custom("FigtreeLight-SemiBold", size: 13))
+                .font(.custom("FigtreeLight-SemiBold", size: 13, relativeTo: .footnote))
                 .foregroundStyle(Color(.muted))
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 18) {
@@ -177,11 +198,11 @@ struct ContentView: View {
                             .transition(.move(edge: .leading).combined(with: .opacity))
                     }
                 }
-                .font(.custom("Cinzel-ExtraBold", size: 20))
+                .font(.custom("Cinzel-ExtraBold", size: 20, relativeTo: .title3))
             }
             .mask(LinearGradient(stops: [.init(color: .black, location: 0.8), .init(color: .clear, location: 1)], startPoint: .leading, endPoint: .trailing))
         }
-        .frame(height: 44)
+        .frame(minHeight: 44)
         .opacity(past.isEmpty ? 0 : 1)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Last rolls, newest first: " + past.map { "\($0.result.total)" }.joined(separator: ", "))
@@ -213,6 +234,7 @@ struct ContentView: View {
                 // shortcut: keeps the last 30 in memory, the history screen (#23) stores more.
                 history = Array(history.prefix(30))
             }
+            AccessibilityNotification.Announcement(spoken(r)).post()
         }
     }
 
