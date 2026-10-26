@@ -22,14 +22,13 @@ struct ContentView: View {
     private var spec: RollSpec { RollSpec(modifier: modifier, mode: mode) }
 
     var body: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: 12) {
             topBar
             dice
             resultText
+            historyRow
             controls
-            historyList
-            Spacer(minLength: 0)
-            bottomBar
+            bottomBar.padding(.top, 4)
         }
         .padding(.horizontal, 16)
         .padding(.bottom, 8)
@@ -104,8 +103,9 @@ struct ContentView: View {
     private var dice: some View {
         Button(action: roll) {
             D20View(die: die)
-                .aspectRatio(1, contentMode: .fit)
-                .frame(maxWidth: .infinity, maxHeight: 280)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                // The clear scene runs on under the result, so the shadow is not cut off.
+                .padding(.bottom, -56)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -116,7 +116,7 @@ struct ContentView: View {
     private var resultText: some View {
         VStack(spacing: 8) {
             Text(result.map { "\($0.total)" } ?? "20")
-                .font(.custom("Cinzel-ExtraBold", size: 104))
+                .font(.custom("Cinzel-ExtraBold", size: 80))
                 .contentTransition(.numericText())
                 .foregroundStyle(tint(result) ?? Color(.foreground))
             Text(label)
@@ -162,18 +162,29 @@ struct ContentView: View {
         }
     }
 
-    private var historyList: some View {
-        VStack(spacing: 4) {
-            ForEach(Array(history.enumerated()), id: \.element.id) { i, entry in
-                let r = entry.result
-                Text("\(r.total)")
-                    .font(i < 3 ? .custom("Cinzel-ExtraBold", size: [30, 23, 18][i]) : .custom("FigtreeLight-SemiBold", size: 13))
-                    .foregroundStyle(tint(r) ?? (i < 2 ? Color(.foreground) : Color(.muted)))
-                    .transition(.move(edge: .top).combined(with: .opacity))
+    // The rolls before the current one, newest on the left. Swipe for older ones.
+    private var historyRow: some View {
+        let past = history.dropFirst()
+        return HStack(spacing: 10) {
+            Text("Last:")
+                .font(.custom("FigtreeLight-SemiBold", size: 13))
+                .foregroundStyle(Color(.muted))
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 18) {
+                    ForEach(Array(past.enumerated()), id: \.element.id) { i, entry in
+                        Text("\(entry.result.total)")
+                            .foregroundStyle(tint(entry.result) ?? (i < 4 ? Color(.foreground) : Color(.muted)))
+                            .transition(.move(edge: .leading).combined(with: .opacity))
+                    }
+                }
+                .font(.custom("Cinzel-ExtraBold", size: 20))
             }
+            .mask(LinearGradient(stops: [.init(color: .black, location: 0.8), .init(color: .clear, location: 1)], startPoint: .leading, endPoint: .trailing))
         }
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("Last rolls: " + history.map { "\($0.result.total)" }.joined(separator: ", "))
+        .frame(height: 44)
+        .opacity(past.isEmpty ? 0 : 1)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Last rolls, newest first: " + past.map { "\($0.result.total)" }.joined(separator: ", "))
     }
 
     private func roll() {
@@ -199,8 +210,8 @@ struct ContentView: View {
                 rolling = false
                 result = r
                 history.insert(Entry(result: r), at: 0)
-                // shortcut: keeps the last 4 in memory, the history screen (#23) stores more.
-                history = Array(history.prefix(4))
+                // shortcut: keeps the last 30 in memory, the history screen (#23) stores more.
+                history = Array(history.prefix(30))
             }
         }
     }

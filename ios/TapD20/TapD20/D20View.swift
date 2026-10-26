@@ -12,6 +12,8 @@ final class D20Scene {
         let camera = SCNNode()
         camera.camera = SCNCamera()
         camera.camera?.fieldOfView = 32
+        // Width sets the die size; extra height is room for the bounce.
+        camera.camera?.projectionDirection = .horizontal
         camera.camera?.zNear = 0.1
         camera.camera?.zFar = 50
         camera.position = SCNVector3(0, 0, 6.2)
@@ -53,10 +55,10 @@ final class D20Scene {
     /// One die in the middle, or two side by side and smaller.
     func layout(count: Int) {
         for (i, holder) in root.childNodes.enumerated() {
-            let x: Float = count == 2 ? (i == 0 ? -0.86 : 0.86) : 0
+            let x: Float = count == 2 ? (i == 0 ? -0.9 : 0.9) : 0
             holder.runAction(.group([
                 .move(to: SCNVector3(x, 0, 0), duration: 0.2),
-                .scale(to: count == 2 ? 0.72 : 1, duration: 0.2),
+                .scale(to: count == 2 ? 0.74 : 1.3, duration: 0.2),
                 .fadeOpacity(to: i < count ? 1 : 0, duration: 0.2),
             ]))
         }
