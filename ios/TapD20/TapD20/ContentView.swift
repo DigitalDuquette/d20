@@ -104,6 +104,8 @@ struct ContentView: View {
         Button(action: roll) {
             D20View(die: die)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+                // The clear scene runs on under the result, so the shadow is not cut off.
+                .padding(.bottom, -56)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
