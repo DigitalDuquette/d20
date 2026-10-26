@@ -5,3 +5,5 @@ xcuserdata/
 *.xcuserstate
 DerivedData/
 build/
+# Per-developer signing team, see ios/TapD20/Signing.xcconfig
+Local.xcconfig

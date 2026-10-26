@@ -1,0 +1,4 @@
+// Keeps the signing team out of git. Put your team in Local.xcconfig (ignored):
+//   DEVELOPMENT_TEAM = YOURTEAMID
+// Do not pick a Team in Signing & Capabilities. Xcode writes it to the project.
+#include? "Local.xcconfig"
