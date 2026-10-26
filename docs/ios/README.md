@@ -31,8 +31,11 @@ The app is a full SwiftUI rewrite, not a web-view wrapper (decided in #5).
 ## Run on your iPhone (free Apple ID)
 
 1. Open `ios/TapD20/TapD20.xcodeproj` in Xcode.
-2. Select the TapD20 target. In Signing & Capabilities, set Team to your
-   Personal Team.
+2. Create `ios/TapD20/Local.xcconfig` with one line,
+   `DEVELOPMENT_TEAM = <your team ID>`. Git ignores this file, so your team
+   ID stays out of the repo. Do not pick a Team in Signing & Capabilities:
+   Xcode writes it into the project file. Find your team ID in Xcode under
+   Settings > Accounts, or at developer.apple.com > Membership.
 3. Connect the iPhone and turn on Developer Mode
    (Settings > Privacy & Security).
 4. Select the iPhone as the run destination and press Run.
