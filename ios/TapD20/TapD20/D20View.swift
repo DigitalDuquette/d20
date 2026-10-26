@@ -69,6 +69,36 @@ final class D20Scene {
         for i in root.childNodes.indices { body(i).runAction(.fadeOpacity(to: i == index ? 0.1 : 1, duration: 0.2)) }
     }
 
+    /// Gentle bob between rolls, as on the web. Each die starts at rest, so nothing jumps.
+    func float(_ on: Bool) {
+        for i in root.childNodes.indices {
+            let b = body(i)
+            b.removeAction(forKey: "float")
+            b.simdPosition.y = 0
+            guard on else { continue }
+            let bob = SCNAction.customAction(duration: 2 * .pi / 1.6) { node, t in
+                node.simdPosition.y = sin(Float(t) * 1.6) * 0.03
+            }
+            // The second die starts later, so the two move out of step.
+            b.runAction(.sequence([.wait(duration: Double(i) * 1.3 / 1.6), .repeatForever(bob)]), forKey: "float")
+        }
+    }
+
+    private nonisolated static let duration = 1.5, lag: Float = 0.12
+
+    /// When each die touches down mid-roll, in seconds from the start, and how hard (0...1).
+    /// Solves the hop curve in roll() for its zeros. The landing itself is not included.
+    nonisolated static func bounces(dice: Int) -> [(time: Double, strength: Double)] {
+        (0..<dice).flatMap { i in
+            let phase = Double(Float(i) * lag)
+            return [1.0 / 3, 2.0 / 3].map { (tp: Double) -> (time: Double, strength: Double) in
+                let t = (tp - phase) / (1 - phase)
+                return (t * duration, pow(1 - t, 1.6))
+            }
+        }
+        .sorted { $0.time < $1.time }
+    }
+
     /// Spins and bounces each die onto its value, about 1.5 s. Reduce Motion: a short fade.
     func roll(_ values: [Int], reduceMotion: Bool) async {
         // Set directly, not faded: a fade action would fight the Reduce Motion fade.
@@ -79,10 +109,10 @@ final class D20Scene {
                 to: D20Geometry.showFace(values[i]),
                 axis: simd_normalize(SIMD3<Float>.random(in: -0.5...0.5)),
                 turns: Float(Int.random(in: 3...4)),
-                phase: Float(i) * 0.12
+                phase: Float(i) * Self.lag
             )
         }
-        let duration = reduceMotion ? 0.25 : 1.5
+        let duration = reduceMotion ? 0.25 : Self.duration
         await root.runAction(.customAction(duration: duration) { root, elapsed in
             let t = Float(min(1, elapsed / duration))
             for (i, s) in spins.enumerated() {
@@ -109,6 +139,7 @@ final class D20Scene {
             body(i).simdPosition.y = 0
             body(i).opacity = 1
         }
+        float(!reduceMotion)
     }
 
     private struct Spin: Sendable {

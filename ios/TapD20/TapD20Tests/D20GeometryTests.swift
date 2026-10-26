@@ -26,4 +26,16 @@ struct D20GeometryTests {
         #expect(simd_distance(q.act(f.normal), toCamera) < 1e-4)
         #expect(simd_distance(q.act(f.up), upright) < 1e-4)
     }
+
+    @Test(arguments: [1, 2])
+    func bouncesLandOnTheHopCurve(dice: Int) {
+        let b = D20Scene.bounces(dice: dice)
+        #expect(b.count == dice * 2)
+        #expect(b.map(\.time) == b.map(\.time).sorted())
+        for (i, phase) in [0.0, Double(Float(0.12))].prefix(dice).enumerated() {
+            let mine = b.filter { abs(sin(($0.time / 1.5 + phase * (1 - $0.time / 1.5)) * .pi * 3)) < 1e-9 }
+            #expect(mine.count >= 2, "die \(i)")
+        }
+        #expect(b.allSatisfy { $0.time > 0 && $0.time < 1.5 && $0.strength > 0 && $0.strength < 1 })
+    }
 }

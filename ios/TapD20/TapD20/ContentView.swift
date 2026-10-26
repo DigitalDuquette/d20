@@ -11,6 +11,8 @@ struct ContentView: View {
     @State private var rolling = false
     @State private var result: RollResult?
     @State private var history: [Entry] = []
+    @State private var bounce = 0
+    @State private var bounceStrength = 0.0
 
     private struct Entry: Identifiable {
         let id = UUID()
@@ -34,8 +36,15 @@ struct ContentView: View {
         .foregroundStyle(Color(.foreground))
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(.background))
-        .onAppear { die.layout(count: spec.diceToRoll) }
+        .onAppear {
+            die.layout(count: spec.diceToRoll)
+            die.float(!reduceMotion)
+        }
         .onChange(of: spec.diceToRoll) { die.layout(count: spec.diceToRoll) }
+        .onChange(of: reduceMotion) { if !rolling { die.float(!reduceMotion) } }
+        .sensoryFeedback(trigger: bounce) { _, _ in
+            haptics ? .impact(flexibility: .rigid, intensity: bounceStrength) : nil
+        }
         // Matches the web app: a light tap on landing, a double tap on a natural 20.
         .sensoryFeedback(trigger: history.first?.id) { _, _ in
             guard haptics, let r = history.first?.result else { return nil }
@@ -172,6 +181,17 @@ struct ContentView: View {
         rolling = true
         // The engine picks the values first; the die only shows them.
         let r = Dice.roll(spec)
+        // A tap each time a die touches down mid-roll, softer as the bounces shrink.
+        let start = ContinuousClock.now
+        if !reduceMotion {
+            Task {
+                for b in D20Scene.bounces(dice: r.values.count) {
+                    try? await Task.sleep(until: start + .seconds(b.time))
+                    bounceStrength = b.strength
+                    bounce += 1
+                }
+            }
+        }
         Task {
             await die.roll(r.values, reduceMotion: reduceMotion)
             die.dim(r.droppedIndex)
